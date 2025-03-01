@@ -61,26 +61,35 @@ selenium-starter-project/
 │
 ├── src/
 │   ├── __init__.py
-│   └── browser_automation.py  # The main browser automation class
+│   ├── browser_automation.py   # Enhanced browser automation class with multi-browser support
+│   ├── config_manager.py       # Configuration management for different environments
+│   └── pages/                  # Page Object Model implementations
+│       ├── __init__.py
+│       ├── base_page.py        # Base class for all page objects
+│       └── google_pages.py     # Google-specific page objects
 │
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py           # Pytest fixtures and configuration
-│   ├── test_google_search.py # Example test case
+│   ├── conftest.py             # Pytest fixtures and configuration with multi-browser support
+│   ├── test_google_search.py   # Example test case
+│   ├── test_with_page_objects.py # Example using Page Object Model
 │   │
-│   ├── reports/              # Store test execution reports
+│   ├── reports/                # Store test execution reports
 │   │   └── .gitkeep
 │   │
-│   ├── screenshots/          # Save screenshots on test failures
+│   ├── screenshots/            # Save screenshots on test failures
 │   │   └── .gitkeep
 │   │
-│   └── logs/                 # Centralized logging for debugging
+│   └── logs/                   # Centralized logging for debugging
 │       └── .gitkeep
 │
-├── requirements.txt          # Dependencies for pip
-├── pyproject.toml            # Project metadata and dependencies for UV
-├── README.md                 # Project documentation
-└── .gitignore                # Files to ignore in version control
+├── config.json                 # Environment-specific configuration
+├── Dockerfile                  # Docker configuration for containerized testing
+├── docker-compose.yml          # Docker Compose setup for easier test execution
+├── requirements.txt            # Dependencies for pip
+├── pyproject.toml              # Project metadata and dependencies for UV
+├── README.md                   # Project documentation
+└── .gitignore                  # Files to ignore in version control
 ```
 
 ## Running Tests
@@ -110,6 +119,68 @@ pytest tests/test_google_search.py
 ```
 
 View logs in the `tests/logs/` directory and screenshots of failures in the `tests/screenshots/` directory.
+
+## Parallel Test Execution
+
+To improve test execution speed, this project supports running tests in parallel using pytest-xdist:
+
+### Setup
+
+1. Install pytest-xdist:
+
+```bash
+# With UV
+uv pip install pytest-xdist
+
+# With pip
+pip install pytest-xdist
+```
+
+2. Verify the dependency is present in your `pyproject.toml`:
+
+```toml
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4.3",
+    "pytest-html>=4.1.1",
+    "pytest-xdist>=3.3.1",
+]
+```
+
+### Running Tests in Parallel
+
+Run tests with multiple processes:
+
+```bash
+# Run with 4 parallel processes
+pytest tests/ -n 4
+
+# Run with auto-detection of CPU cores
+pytest tests/ -n auto
+
+# Run specific test file in parallel
+pytest tests/test_google_search.py -n 2
+```
+
+### Considerations for Parallel Testing
+
+- Ensure your tests are independent and don't share state
+- Use unique filenames for screenshots and reports
+- Don't hard-code resource names that could conflict
+- Consider using pytest fixtures with 'function' scope
+- If using a real browser (non-headless), be aware of screen real estate
+
+### Debugging Parallel Tests
+
+When a test fails during parallel execution, you can rerun it in isolation:
+
+```bash
+# Rerun a specific failing test in regular mode
+pytest tests/test_google_search.py::test_google_search -v
+```
+
+The HTML reports and screenshots will help trace issues that only appear during parallel execution.
+
 
 ## Usage Examples
 

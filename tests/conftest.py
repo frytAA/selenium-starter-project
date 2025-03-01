@@ -1,5 +1,5 @@
 """
-Pytest configuration file with fixtures and hooks.
+Pytest configuration file with fixtures and hooks for multiple browsers.
 """
 import os
 import logging
@@ -54,27 +54,58 @@ def initialize_logging():
     logger.info("Test session ended")
 
 
+def pytest_addoption(parser):
+    """Add command line options to pytest."""
+    parser.addoption(
+        "--browser", 
+        default="chrome", 
+        help="Browser to run tests on: chrome, firefox, edge, or safari"
+    )
+    parser.addoption(
+        "--headless", 
+        action="store_true", 
+        default=False,
+        help="Run browser in headless mode"
+    )
+
+
 @pytest.fixture(scope="function")
-def browser():
+def browser(request):
     """
     Provide a browser instance for each test.
     
     Returns:
         BrowserAutomation: A browser automation instance
     """
-    # Create browser instance with configurable headless mode from environment
-    headless = os.environ.get("HEADLESS", "False").lower() == "true"
-    browser_instance = BrowserAutomation(headless=headless)
+    # Get browser type from command line or environment variable
+    browser_type = request.config.getoption("--browser")
+    browser_env = os.environ.get("BROWSER", "").lower()
+    if browser_env:
+        browser_type = browser_env
     
-    # Log browser creation
-    logging.info("Browser instance created")
+    # Get headless mode from command line or environment variable
+    headless = request.config.getoption("--headless")
+    headless_env = os.environ.get("HEADLESS", "").lower() == "true"
+    if headless_env:
+        headless = True
+    
+    # Log browser details
+    logging.info(f"Creating {browser_type} browser instance (headless={headless})")
+    
+    # Create browser instance
+    try:
+        browser_instance = BrowserAutomation(browser_type=browser_type, headless=headless)
+        logging.info(f"{browser_type.capitalize()} browser instance created successfully")
+    except Exception as e:
+        logging.error(f"Failed to create {browser_type} browser instance: {e}")
+        raise
     
     # Provide the browser to the test
     yield browser_instance
     
     # Cleanup after test
     browser_instance.close()
-    logging.info("Browser instance closed")
+    logging.info(f"{browser_type.capitalize()} browser instance closed")
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
@@ -103,7 +134,8 @@ def pytest_runtest_makereport(item, call):
                 # Generate a unique filename
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 test_name = item.name
-                screenshot_path = str(screenshot_dir / f"fail_{test_name}_{timestamp}.png")
+                browser_type = browser_fixture.browser_type.lower()
+                screenshot_path = str(screenshot_dir / f"fail_{test_name}_{browser_type}_{timestamp}.png")
                 
                 # Take screenshot
                 browser_fixture.take_screenshot(screenshot_path)
@@ -134,5 +166,6 @@ def pytest_configure(config):
     # Set up HTML report if pytest-html plugin is available
     if hasattr(config, "_html"):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        config._html.report_title = "Selenium Test Report"
-        config._html.logfile = f"tests/reports/report_{timestamp}.html"
+        browser_type = config.getoption("--browser", "chrome")
+        config._html.report_title = f"Selenium Test Report - {browser_type.capitalize()}"
+        config._html.logfile = f"tests/reports/report_{browser_type}_{timestamp}.html"
